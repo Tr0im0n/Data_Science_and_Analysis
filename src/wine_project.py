@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Tools #######################################################################
 
+# Tools #######################################################################
 
 def sort_val_vec(values: np.ndarray, matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     order = np.argsort(values)[::-1]
@@ -24,9 +24,12 @@ def pca(df: pd.DataFrame) -> (np.ndarray, np.ndarray):
 os.chdir(r"../data")
 wine_df = pd.read_csv("winequality-red.csv", delimiter=';')
 # print(wine_df.describe())
+print(wine_df.shape)
 
 
 def plot_all():
+    plt.plot(wine_df)
+    plt.show()
     for attribute in wine_df.columns:
         plt.plot(wine_df[attribute])
         plt.title(attribute)
@@ -44,4 +47,30 @@ def test1():
     for i, j in zip(vecs[0]*1000, wine_df.columns):
         print(j, i, sep=" & ")
 
-test1()
+
+def test2():
+    vals, vecs = pca(wine_df)
+    for val, vec in zip(vals, vecs):
+        plt.plot(vec, label=str(val))
+    plt.legend()
+    plt.show()
+
+
+def sort():
+    high_vals = ['free sulfur dioxide', 'total sulfur dioxide']
+    medium_vals = ['fixed acidity', 'residual sugar', 'pH', 'alcohol', 'quality']
+    low_vals = ['volatile acidity', 'citric acid', 'chlorides', 'density', 'sulphates']
+    titles = ["Low Vals", "Medium Vals", "High Vals"]
+    all_vals = [low_vals, medium_vals, high_vals]
+    maxes = [2, 15, 280]
+
+    for title, maxi, vals in zip(titles, maxes, all_vals):
+        for name in vals:
+            plt.plot(np.sort(wine_df[name]), label=name)
+        plt.vlines(1595, 0, maxi)
+        plt.title(title)
+        plt.legend()
+        plt.show()
+
+
+test2()
