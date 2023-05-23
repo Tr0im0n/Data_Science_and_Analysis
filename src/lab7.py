@@ -1,21 +1,28 @@
-import csv
 import os
-from functools import partial
-
 import numpy as np
-import pandas as pd
 from matplotlib import pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+# Readme ##############################################################################
+# You might need to change the filestructure in "import data"
+# def k_means() calculates the k_means of the given dataset
+# def anim() shows an animation of this proces
+# Steps:
+# 1. Find some initial centers: can be random, the way I implemented it
+#    is by picking evenly spaced points on a circle in the centre of the dataset
+# 2. Divide the data into clusters: calculate the distance between a point and
+#    all the centers and add the point to the cluster belonging to the nearest center
+# 3. Calculate the new center: average of all the points in a cluster
+
+# Function calls are on line 121 and 122
+
+# import data ##########################################################################
 os.chdir(r"..\data")
 file_name = "StarTypeDataset.csv"
-# star_df = pd.read_csv(file_name)
-
 my_data = np.genfromtxt(file_name, delimiter=',', skip_header=1)
-# my_transpose = np.transpose(my_data)
-# temp_array = my_transpose[0]
-# mag_array = my_transpose[0]
 
+
+# Tool functions ##########################################################################
 
 def simple_plot():
     plt.scatter(my_data[0, :], my_data[1, :])
@@ -59,9 +66,68 @@ def make_new_centers(centers, return_clusters=False):
     return ans
 
 
-def k_means(k=5):
+# Final functions ##########################################################################
+
+def k_means(data: np.ndarray, k=5, clusters: bool = False):
+    bounds = tuple((min(data[:, i]), max(data[:, i])) for i in range(data.shape[1]))
+    centers = initial_centers(k, bounds)
+
+    for _ in range(7):
+        centers = make_new_centers(centers)
+
+    return make_new_centers(centers, clusters)
+
+
+def anim(data: np.ndarray, k=5):
+    fig = plt.figure()
+    # ax = plt.axes(xlim=(-2, 2), ylim=(-2, 2))
+    ax = plt.axes()
+
+    bounds = tuple((min(data[:, i]), max(data[:, i])) for i in range(data.shape[1]))
+    centers = initial_centers(k, bounds)
+
+    def init():
+        plt.scatter(data[:, 0], data[:, 1], s=36, marker='*')
+        plt.scatter(*centers.transpose(), s=48, c='k')
+        return
+
+    def animate(frame):
+        ax.clear()
+        ax.set_title(f"Frame: {frame}")
+
+        nonlocal centers
+
+        if not frame:
+            centers = initial_centers(k, bounds)
+            init()
+            return
+
+        centers, clusters = make_new_centers(centers, True)
+        for cluster in clusters:
+            plt.scatter(data[cluster, 0], data[cluster, 1], s=36, marker='*')
+
+        plt.scatter(*centers.transpose(), s=48, c='k')
+        return
+
+    animation = FuncAnimation(fig,
+                              func=animate,
+                              frames=8,
+                              init_func=init,
+                              interval=500,
+                              repeat=True)
+    plt.show()
+    plt.close()
+    return
+
+
+print(*tuple(f"Center: {i} \t Cluster indices: {j}" for i, j in zip(*k_means(my_data, 5, True))), sep="\n")
+anim(my_data)
+
+
+# Old #################################################################################################
+
+def k_means_old(k=5):
     bounds = tuple((min(my_data[:, i]), max(my_data[:, i])) for i in range(my_data.shape[1]))
-    # print(bounds)
     centers = initial_centers(k, bounds)
 
     plt.scatter(my_data[:, 0], my_data[:, 1])
@@ -81,50 +147,3 @@ def k_means(k=5):
     plt.show()
 
     return centers
-
-
-def anim():
-    fig = plt.figure()
-    # ax = plt.axes(xlim=(-2, 2), ylim=(-2, 2))
-    ax = plt.axes()
-
-    k = 5
-    bounds = tuple((min(my_data[:, i]), max(my_data[:, i])) for i in range(my_data.shape[1]))
-    centers = initial_centers(k, bounds)
-
-    def init():
-        plt.scatter(my_data[:, 0], my_data[:, 1], s=36, marker='*')
-        plt.scatter(*centers.transpose(), s=48, c='k')
-        return
-
-    def animate(frame):
-        ax.clear()
-        ax.set_title(f"Frame: {frame}")
-
-        nonlocal centers
-
-        if not frame:
-            centers = initial_centers(k, bounds)
-            init()
-            return
-
-        centers, clusters = make_new_centers(centers, True)
-        for cluster in clusters:
-            plt.scatter(my_data[cluster, 0], my_data[cluster, 1], s=36, marker='*')
-
-        plt.scatter(*centers.transpose(), s=48, c='k')
-        return
-
-    animation = FuncAnimation(fig,
-                              func=animate,
-                              frames=8,
-                              init_func=init,
-                              interval=500,
-                              repeat=True)
-    plt.show()
-    plt.close()
-    return
-
-
-anim()
-# print( k_means(5) )
