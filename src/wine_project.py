@@ -3,9 +3,12 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
+
+from chatgpt_tensorflow_03 import machine_learn
 
 
-# Tools #######################################################################
+# Tools ------------------------------------------------------------------
 
 def sort_val_vec(values: np.ndarray, matrix: np.ndarray) -> (np.ndarray, np.ndarray):
     order = np.argsort(values)[::-1]
@@ -19,19 +22,56 @@ def pca(df: pd.DataFrame) -> (np.ndarray, np.ndarray):
     return sort_val_vec(e_vals, e_vecs)
 
 
-# Code ################################################################
-
-os.chdir(r"../data")
-wine_df = pd.read_csv("winequality-red.csv", delimiter=';')
-# print(wine_df.describe())
-print(wine_df.shape)
+def normalize_array(array: np.ndarray) -> np.ndarray:
+    return (array - np.mean(array)) / np.std(array)
 
 
-def plot_all():
-    plt.plot(wine_df)
+# Functions ------------------------------------------------------------------
+
+def get_wine_df() -> pd.DataFrame:
+    os.chdir(r"../data")
+    return pd.read_csv("winequality-red.csv", delimiter=';')
+
+
+def remove_high_outliers(df: pd.DataFrame) -> pd.DataFrame:
+    upper_limit_dict = {'fixed acidity': 14.5,
+                        'volatile acidity': 1.15,
+                        'citric acid': 0.8,
+                        'residual sugar': 10,
+                        'chlorides': 0.5,
+                        'free sulfur dioxide': 60,
+                        'total sulfur dioxide': 200,
+                        'density': None,
+                        'pH': 3.8,
+                        'sulphates': 1.4,
+                        'alcohol': 14.5}
+    high_outliers_indices = []
+    for key, value in upper_limit_dict.items():
+        indices = df[df[key] > value].index
+        for i in indices:
+            if i not in high_outliers_indices:
+                high_outliers_indices.append(i)
+    return df.drop(high_outliers_indices)
+
+
+def normalize_df(df: pd.DataFrame) -> pd.DataFrame:
+    # Normalize all columns using StandardScaler
+    scaler = StandardScaler()
+    normalized_data = scaler.fit_transform(df)
+    # Create a new DataFrame with normalized values
+    return pd.DataFrame(normalized_data, columns=df.columns)
+
+
+def plot_all(df: pd.DataFrame, show_separate: bool = False) -> None:
+    for column in df.columns:
+        plt.plot(df[column], label=column)
+    plt.title("All Attributes")
+    plt.legend()
     plt.show()
-    for attribute in wine_df.columns:
-        plt.plot(wine_df[attribute])
+    if not show_separate:
+        return
+    for attribute in df.columns:
+        plt.plot(df[attribute])
         plt.title(attribute)
         plt.xlabel("index")
         plt.ylabel(attribute)
@@ -39,24 +79,12 @@ def plot_all():
         plt.close()
 
 
-def test1():
-    vals, vecs = pca(wine_df)
-    print(vecs[0]*1000)
-    plt.plot(vecs[0]*1000)
-    plt.show()
-    for i, j in zip(vecs[0]*1000, wine_df.columns):
-        print(j, i, sep=" & ")
-
-
-def test2():
-    vals, vecs = pca(wine_df)
-    for val, vec in zip(vals, vecs):
-        plt.plot(vec, label=str(val))
+def sort_attributes(df: pd.DataFrame) -> None:
+    for column in df.columns:
+        plt.plot(np.sort(df[column]), label=column)
     plt.legend()
     plt.show()
 
-
-def sort():
     high_vals = ['free sulfur dioxide', 'total sulfur dioxide']
     medium_vals = ['fixed acidity', 'residual sugar', 'pH', 'alcohol', 'quality']
     low_vals = ['volatile acidity', 'citric acid', 'chlorides', 'density', 'sulphates']
@@ -66,11 +94,178 @@ def sort():
 
     for title, maxi, vals in zip(titles, maxes, all_vals):
         for name in vals:
-            plt.plot(np.sort(wine_df[name]), label=name)
-        plt.vlines(1595, 0, maxi)
+            plt.plot(np.sort(df[name]), label=name)
+        # plt.vlines(1500, 0, maxi, 'k')
         plt.title(title)
         plt.legend()
         plt.show()
 
 
-test2()
+def plot_against_quality(df: pd.DataFrame) -> None:
+    n_cols = 6
+    fig, axs = plt.subplots(2, n_cols, sharey="all")
+    fig.suptitle("First 9 components vs quality, with linfit line")
+    for i, attribute in enumerate(df.columns):
+        if attribute == 'quality':
+            continue
+        ax = axs[i // n_cols][i % n_cols]
+        ax.scatter(df[attribute], df['quality'])
+        ax.set_xlabel(attribute)
+        if not i % n_cols:
+            ax.set_ylabel('quality')
+        coef = np.polyfit(df[attribute], df['quality'], 1)
+        min_at = min(df[attribute])
+        max_at = max(df[attribute])
+        xs = np.linspace(min_at, max_at, 2000)
+        ys = np.polyval(coef, xs)
+        ax.plot(xs, ys, color='r')
+        # ax.set_title(f"a = {coef[1]:.2f}, b = {coef[0]:.2f}")
+        print(f"{attribute} & {coef[0]:.4f} \\\\")
+    plt.show()
+
+
+def pca_table(df: pd.DataFrame, show_scree: bool = True) -> None:
+    vals, vecs = pca(df)
+    print("Eigenvalue", end="")
+    for val in vals:
+        print(f" & {val:.2f}", end="")
+    print(" \\\\")
+
+    sum_val = sum(vals)
+    fracs = tuple(100 * val / sum_val for val in vals)
+    print("Percentage(%)", end="")
+    for frac in fracs:
+        print(f" & {frac:.2f}", end="")
+    print(" \\\\")
+
+    for i, attribute in enumerate(df.columns):
+        print(attribute, end="")
+        for vec in vecs:
+            print(f" & {round(1000*vec[i])}", end="")
+        print(" \\\\")
+
+    if show_scree:
+        plt.plot(fracs, color='b')
+        for i, frac in enumerate(fracs):
+            plt.scatter(i, frac, color='b', label=f"{frac:.2f}%")
+        plt.title("Scree plot of PCA")
+        plt.legend()
+        plt.xlabel("Principal Component")
+        plt.ylabel("Variance explained")
+        plt.show()
+
+
+def scatter_first_2_components(clipped_df: pd.DataFrame, normalized_df: pd.DataFrame) -> None:
+    vals, vecs = pca(normalized_df)
+    transform_matrix = np.transpose(vecs[:2])
+    new_data = np.dot(normalized_df, transform_matrix)
+    colors = ['k', 'k', 'k', 'r', 'g', 'b', 'y', 'm', 'c']
+    color_lis = [colors[i] for i in clipped_df['quality']]
+    plt.scatter(new_data[:, 0], new_data[:, 1], c=color_lis)
+    for i in range(3, 9):
+        plt.scatter(-4, -4, c=colors[i], label=i)
+    plt.scatter(-4, -4, s=72, c='w')
+    plt.title("Scatter plot of first 2 principal components with quality as color")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.legend()
+    plt.gca().set_aspect('equal')
+    plt.show()
+
+
+def remove_2_dimensions(df: pd.DataFrame, return_df: bool = False) -> np.ndarray | pd.DataFrame:
+    vals, vecs = pca(df)
+    transform_matrix = np.transpose(vecs[:-2])
+    dimension_reduced_array = np.dot(df, transform_matrix)
+    if not return_df:
+        return dimension_reduced_array
+    else:
+        df = pd.DataFrame(dimension_reduced_array)
+        df.columns = [f"component {i+1}" for i in range(len(vals)-2)]
+        return df
+
+
+def plot_ml_predicted(clipped_df: pd.DataFrame) -> None:
+    weights = [0.05973548, -1.027153, -0.2547749, 0.0045553, -0.93602085, 0.00216343,
+               -0.00248034, 0.32539114, 0.35694644, 1.0199566, 0.3231147]
+    bias = 0.4254112
+    testing_loss = 0.45
+    predicted_qualities = np.dot(clipped_df.iloc[:, :11], np.transpose(weights)) + bias
+    plt.scatter(clipped_df["quality"], predicted_qualities, label="scatter")
+    plt.gca().set_aspect("equal")
+    xs = [3, 8]
+    plt.plot(xs, xs, color='k', label="y=x")
+    plt.title("real vs predicted qualities, of ML")
+    plt.ylabel("predicted qualities")
+    plt.xlabel("real qualities")
+    coef = np.polyfit(clipped_df["quality"], predicted_qualities, 1)
+    plt.plot(xs, np.polyval(coef, xs), color='r', label=f"fit, testing loss: {testing_loss}")
+    plt.legend()
+    plt.show()
+
+
+def plot_ml_dimension_reduced(dimension_reduced_df: pd.DataFrame):
+    weights = [[-0.05233626], [0.2821826], [-0.19712853], [0.02563123], [-0.0879453],
+               [-0.01019083], [-0.09990207], [0.068753], [0.12720628]]
+    bias = 5.6673555
+    testing_loss = 0.43
+    predicted_qualities = np.dot(dimension_reduced_df.iloc[:, :9], weights) + bias
+    plt.scatter(dimension_reduced_df["quality"], predicted_qualities, label="scatter")
+    plt.gca().set_aspect("equal")
+    xs = [3, 8]
+    plt.plot(xs, xs, color='k', label="y=x")
+    plt.title("real vs predicted qualities, of ML on dimension reduced input")
+    plt.ylabel("predicted qualities")
+    plt.xlabel("real qualities")
+    coef = np.polyfit(dimension_reduced_df["quality"], predicted_qualities, 1)
+    plt.plot(xs, np.polyval(coef, xs), color='r', label=f"fit, testing loss: {testing_loss}")
+    plt.legend()
+    plt.show()
+
+
+# Run ------------------------------------------------------------------
+
+def main():
+    # cleaning data ------------------------------------------------------------------
+    initial_wine_df = get_wine_df()
+    clipped_wine_df = remove_high_outliers(initial_wine_df)
+    clipped_qualities_array = clipped_wine_df["quality"].values
+    normalized_wine_df = normalize_df(clipped_wine_df)
+    dimension_reduced_wine_df = remove_2_dimensions(normalized_wine_df.iloc[:, :11])    # , return_df=True
+    # dimension_reduced_wine_df['quality'] = pd.DataFrame(clipped_qualities_array)
+
+    # tests ------------------------------------------------------------------
+    # plot_all(initial_wine_df)
+    # sort_attributes(initial_wine_df)
+    # plot_against_quality(normalized_wine_df)
+    # pca_table(clipped_wine_df.iloc[:, :11])
+    # scatter_first_2_components(clipped_wine_df, normalized_wine_df)
+    # plot_against_quality(normalized_wine_df)
+    # plot_ml_predicted(clipped_wine_df)
+    machine_learn(dimension_reduced_wine_df, clipped_qualities_array)
+    # plot_ml_dimension_reduced(dimension_reduced_wine_df)
+
+
+if __name__ == "__main__":
+    main()
+
+
+# Old ------------------------------------------------------------------
+
+def all_pcas(df: pd.DataFrame) -> None:
+    vals, vecs = pca(df)
+    for val, vec in zip(vals, vecs):
+        plt.plot(vec, label=str(val))
+    plt.legend()
+    plt.title("All PCA's")
+    plt.show()
+
+
+def pca_number(df: pd.DataFrame, pca_n: int = 0) -> None:
+    vals, vecs = pca(df)
+    plt.plot(vecs[pca_n]*1000)
+    plt.title("First PCA")
+    plt.show()
+    for i, j in zip(vecs[pca_n]*1000, df.columns):
+        print(j, i, sep=" & ")
+
