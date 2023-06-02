@@ -92,13 +92,15 @@ def sort_attributes(df: pd.DataFrame) -> None:
     all_vals = [low_vals, medium_vals, high_vals]
     maxes = [2, 15, 280]
 
-    for title, maxi, vals in zip(titles, maxes, all_vals):
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+
+    for title, maxi, vals, ax in zip(titles, maxes, all_vals, (ax1, ax2, ax3)):
         for name in vals:
-            plt.plot(np.sort(df[name]), label=name)
+            ax.plot(np.sort(df[name]), label=name)
         # plt.vlines(1500, 0, maxi, 'k')
-        plt.title(title)
-        plt.legend()
-        plt.show()
+        ax.set_title(title)
+        ax.legend()
+    plt.show()
 
 
 def plot_against_quality(df: pd.DataFrame) -> None:
@@ -120,7 +122,8 @@ def plot_against_quality(df: pd.DataFrame) -> None:
         ys = np.polyval(coef, xs)
         ax.plot(xs, ys, color='r')
         # ax.set_title(f"a = {coef[1]:.2f}, b = {coef[0]:.2f}")
-        print(f"{attribute} & {coef[0]:.4f} \\\\")
+        # print(f"{attribute} & {coef[0]:.4f} \\\\")
+        print(f"{coef[0]:.4f}")
     plt.show()
 
 
@@ -223,6 +226,41 @@ def plot_ml_dimension_reduced(dimension_reduced_df: pd.DataFrame):
     plt.show()
 
 
+def plot_lin_fit_predicted(dimension_reduced_df: pd.DataFrame):
+    weights = [-0.0644, 0.2711, -0.2079,  0.0266, -0.0771,
+               -0.0098, -0.1128, 0.0844, 0.1159]
+    bias = 5.6673555
+    testing_loss = "?"
+
+    predicted_qualities = np.dot(dimension_reduced_df.iloc[:, :9], np.transpose(weights)) + bias
+    plt.scatter(dimension_reduced_df["quality"], predicted_qualities, label="scatter")
+    plt.gca().set_aspect("equal")
+    xs = [3, 8]
+    plt.plot(xs, xs, color='k', label="y=x")
+    plt.title("real vs predicted qualities, of lin-fit on dimension reduced input")
+    plt.ylabel("predicted qualities")
+    plt.xlabel("real qualities")
+    coef = np.polyfit(dimension_reduced_df["quality"], predicted_qualities, 1)
+    plt.plot(xs, np.polyval(coef, xs), color='r', label=f"fit, testing loss: {testing_loss}")
+    plt.legend()
+    plt.show()
+
+
+def scatter_2_highest_impact(df: pd.DataFrame) -> None:
+    colors = ['k', 'k', 'k', 'r', 'g', 'b', 'y', 'm', 'c']
+    color_list = [colors[q] for q in df['quality']]
+    plt.scatter(df[:, 1], df[:, 2], c=color_list)
+    for i in range(3, 9):
+        plt.scatter(-4, -4, c=colors[i], label=i)
+    plt.scatter(-4, -4, s=72, c='w')
+    plt.title("Scatter plot of first 2 principal components with quality as color")
+    plt.xlabel("Component 1")
+    plt.ylabel("Component 2")
+    plt.legend()
+    plt.gca().set_aspect('equal')
+    plt.show()
+
+
 # Run ------------------------------------------------------------------
 
 def main():
@@ -231,19 +269,19 @@ def main():
     clipped_wine_df = remove_high_outliers(initial_wine_df)
     clipped_qualities_array = clipped_wine_df["quality"].values
     normalized_wine_df = normalize_df(clipped_wine_df)
-    dimension_reduced_wine_df = remove_2_dimensions(normalized_wine_df.iloc[:, :11])    # , return_df=True
-    # dimension_reduced_wine_df['quality'] = pd.DataFrame(clipped_qualities_array)
+    dimension_reduced_wine_df = remove_2_dimensions(normalized_wine_df.iloc[:, :11], return_df=True)    # , return_df=True
+    dimension_reduced_wine_df['quality'] = pd.DataFrame(clipped_qualities_array)
 
     # tests ------------------------------------------------------------------
     # plot_all(initial_wine_df)
     # sort_attributes(initial_wine_df)
-    # plot_against_quality(normalized_wine_df)
     # pca_table(clipped_wine_df.iloc[:, :11])
     # scatter_first_2_components(clipped_wine_df, normalized_wine_df)
-    # plot_against_quality(normalized_wine_df)
+    # plot_against_quality(dimension_reduced_wine_df)
     # plot_ml_predicted(clipped_wine_df)
-    machine_learn(dimension_reduced_wine_df, clipped_qualities_array)
+    # machine_learn(dimension_reduced_wine_df, clipped_qualities_array)
     # plot_ml_dimension_reduced(dimension_reduced_wine_df)
+    plot_lin_fit_predicted(dimension_reduced_wine_df)
 
 
 if __name__ == "__main__":
